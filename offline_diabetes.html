@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SPK Risiko Diabetes</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f5f7;color:#20252b;font-family:Arial,Helvetica,sans-serif}main{max-width:820px;margin:24px auto;padding:0 15px 28px}header{border-bottom:2px solid #24476b;padding:5px 0 16px;margin-bottom:20px}h1{font-size:25px;line-height:1.3;margin:0 0 7px;color:#1f2937}h2{font-size:19px;margin:0 0 14px;color:#26384a}.muted{color:#626c78;font-size:14px;line-height:1.5}section{background:#fff;border:1px solid #d8dde4;border-radius:7px;padding:18px;margin:14px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}input,select{display:block;width:100%;padding:11px;border:1px solid #b9c1cb;border-radius:5px;background:#fff;color:#20252b;font-size:16px}button{width:100%;padding:12px;background:#24476b;color:#fff;border:0;border-radius:5px;font-size:16px;font-weight:600;margin-top:18px}#result{display:none}.result-card{padding:12px 14px;border-left:5px solid #477b51;background:#f5faf6;border-radius:4px}.result-card.high{border-color:#a83b3b;background:#fff7f7}.result-name{font-size:23px;font-weight:700;margin:0 0 7px}.small,footer{color:#626c78;font-size:13px;line-height:1.5}details{border-top:1px solid #e0e4e9;margin-top:16px;padding-top:14px}summary{font-size:14px;font-weight:600;cursor:pointer;color:#24476b}.tablewrap{overflow-x:auto;margin-top:10px}table{border-collapse:collapse;width:100%;font-size:13px;min-width:500px}th,td{text-align:left;padding:8px 7px;border-bottom:1px solid #e0e4e9;white-space:nowrap}th{background:#eef1f5;font-weight:600}footer{padding:8px 2px}@media(max-width:560px){main{margin-top:15px}.grid{grid-template-columns:1fr}h1{font-size:22px}section{padding:15px}}
+</style></head><body><main>
+<header><h1>Sistem Pendukung Keputusan Risiko Diabetes</h1><div class="muted">Klasifikasi menggunakan algoritma K-Nearest Neighbors (KNN)</div></header>
+<section><h2>Input Data Pasien</h2><p class="muted" style="margin-top:-7px;margin-bottom:16px">Masukkan nilai pasien, lalu tekan tombol prediksi.</p>
+<form id="predictForm"><div class="grid">
+<div><label for="usia">Usia (tahun)</label><input id="usia" type="number" min="1" max="100" value="40" required></div>
+<div><label for="bmi">BMI</label><input id="bmi" type="number" min="10" max="50" step="0.1" value="28.0" required></div>
+<div><label for="glukosa">Glukosa (mg/dL)</label><input id="glukosa" type="number" min="50" max="300" value="130" required></div>
+<div><label for="td">Tekanan Darah</label><input id="td" type="number" min="80" max="200" value="128" required></div>
+<div><label for="riwayat">Riwayat Diabetes dalam Keluarga</label><select id="riwayat"><option value="0">Tidak ada (0)</option><option value="1">Ada (1)</option></select></div>
+<div><label for="k">Nilai K (jumlah tetangga)</label><select id="k"><option value="1">1 tetangga</option><option value="3" selected>3 tetangga</option><option value="5">5 tetangga</option></select></div>
+</div><button type="submit">Prediksi Risiko</button></form></section>
+<section id="result"><h2>Hasil Klasifikasi</h2><div class="result-card" id="resultCard"><div class="result-name" id="resultName"></div><div id="votes"></div><p class="small" id="nearest"></p></div><details><summary>Lihat data tetangga terdekat</summary><div class="tablewrap"><table><thead><tr><th>No.</th><th>Pasien</th><th>Usia</th><th>BMI</th><th>Glukosa</th><th>Kelas</th><th>Jarak</th></tr></thead><tbody id="neighborRows"></tbody></table></div></details></section>
+<section><details><summary>Lihat dataset latihan (10 data)</summary><p class="small">Data studi kasus yang digunakan untuk membentuk model KNN.</p><div class="tablewrap"><table><thead><tr><th>Pasien</th><th>Usia</th><th>BMI</th><th>Glukosa</th><th>Tekanan Darah</th><th>Riwayat Keluarga</th><th>Kelas</th></tr></thead><tbody id="datasetRows"></tbody></table></div></details></section>
+<footer>Metode: StandardScaler, KNN, dan jarak Euclidean. Dataset merupakan contoh studi kasus akademik, bukan alat diagnosis medis.</footer></main>
+<script>
+(function(){"use strict";
+const data=[
+["P01",25,21.5,90,110,0,"Risiko Rendah"],["P02",30,23.1,95,115,0,"Risiko Rendah"],["P03",35,25,105,120,0,"Risiko Rendah"],["P04",40,27.5,120,125,1,"Risiko Tinggi"],["P05",45,30.2,140,135,1,"Risiko Tinggi"],["P06",50,31.5,155,140,1,"Risiko Tinggi"],["P07",55,33,165,145,1,"Risiko Tinggi"],["P08",28,22.5,92,112,0,"Risiko Rendah"],["P09",38,26.8,115,122,0,"Risiko Rendah"],["P10",48,29.5,145,130,1,"Risiko Tinggi"]];
+const cols=[1,2,3,4,5];
+const stats=cols.map(c=>{const a=data.map(r=>Number(r[c]));const avg=a.reduce((s,v)=>s+v,0)/a.length;const sd=Math.sqrt(a.reduce((s,v)=>s+Math.pow(v-avg,2),0)/a.length)||1;return {avg,sd};});
+function scale(v){return v.map((x,i)=>(Number(x)-stats[i].avg)/stats[i].sd)}
+const train=data.map(r=>scale(cols.map(c=>r[c])));
+function cell(tr,value){const td=document.createElement("td");td.textContent=String(value);tr.appendChild(td)}
+data.forEach(r=>{const tr=document.createElement("tr");[r[0],r[1],r[2],r[3],r[4],r[5]===1?"Ada (1)":"Tidak (0)",r[6]].forEach(v=>cell(tr,v));document.getElementById("datasetRows").appendChild(tr)});
+document.getElementById("predictForm").addEventListener("submit",function(e){e.preventDefault();
+const vals=["usia","bmi","glukosa","td","riwayat"].map(id=>Number(document.getElementById(id).value));const k=Number(document.getElementById("k").value);const input=scale(vals);
+const ranked=data.map((row,i)=>({row,d:Math.sqrt(input.reduce((sum,v,j)=>sum+Math.pow(v-train[i][j],2),0))})).sort((a,b)=>a.d-b.d);const near=ranked.slice(0,k);const high=near.filter(x=>x.row[6]==="Risiko Tinggi").length;const low=k-high;const result=high>low?"Risiko Tinggi":"Risiko Rendah";
+document.getElementById("result").style.display="block";document.getElementById("resultCard").className="result-card"+(result==="Risiko Tinggi"?" high":"");document.getElementById("resultName").textContent=result;document.getElementById("votes").textContent="Dari "+k+" tetangga terdekat: "+high+" Risiko Tinggi dan "+low+" Risiko Rendah.";document.getElementById("nearest").textContent="Jarak tetangga terdekat: "+near[0].d.toFixed(4)+".";
+const body=document.getElementById("neighborRows");body.textContent="";near.forEach((x,i)=>{const tr=document.createElement("tr");[i+1,x.row[0],x.row[1],x.row[2],x.row[3],x.row[6],x.d.toFixed(4)].forEach(v=>cell(tr,v));body.appendChild(tr)});document.getElementById("result").scrollIntoView({behavior:"smooth",block:"start"});
+});})();
+</script></body></html>
